@@ -1,3 +1,18 @@
 #index:
 #    path: /
 #    controller: App\Controller\DefaultController::index
+
+personas:
+    type    : rest
+    resource: App\Controller\Rest\PersonasController
+    prefix  : rest
+
+dates:
+    type    : rest
+    resource: App\Controller\Rest\DatesController
+    prefix  : rest
+
+user:
+    type    : annotation
+    resource: App\Controller\Rest\UserController
+    prefix  : rest
