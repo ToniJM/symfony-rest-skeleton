@@ -10,6 +10,7 @@ use App\Exception\ValidationException;
 use App\Repository\DateRepository;
 use Doctrine\ORM\EntityManagerInterface;
 use FOS\RestBundle\Controller\AbstractFOSRestController;
+use FOS\RestBundle\Controller\Annotations as Rest;
 use FOS\RestBundle\View\View;
 use ReflectionException;
 use Sensio\Bundle\FrameworkExtraBundle\Configuration\ParamConverter;
@@ -19,6 +20,7 @@ use Symfony\Component\Validator\ConstraintViolationListInterface;
 
 /**
  * @Security("is_anonymous() or is_authenticated()")
+ * @Rest\View(serializerEnableMaxDepthChecks=true)
  */
 class DatesController extends AbstractFOSRestController
 {

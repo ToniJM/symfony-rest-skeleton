@@ -5,6 +5,7 @@ namespace App\Serializer;
 
 
 use App\Annotation\DeserializeEntity;
+use App\Service\EntityMerger;
 use Doctrine\Common\Annotations\Reader;
 use Doctrine\ORM\Mapping\ManyToMany;
 use JMS\Serializer\EventDispatcher\EventSubscriberInterface;
@@ -28,11 +29,22 @@ class DoctrineEntityDeserializationSubscriber implements EventSubscriberInterfac
      * @var RegistryInterface
      */
     private $doctrineRepository;
+    /**
+     * @var EntityMerger
+     */
+    private $entityMerger;
 
-    public function __construct(Reader $reader, RegistryInterface $doctrineRepository)
+    /**
+     * DoctrineEntityDeserializationSubscriber constructor.
+     * @param Reader $reader
+     * @param RegistryInterface $doctrineRepository
+     * @param EntityMerger $entityMerger
+     */
+    public function __construct(Reader $reader, RegistryInterface $doctrineRepository, EntityMerger $entityMerger)
     {
         $this->reader = $reader;
         $this->doctrineRepository = $doctrineRepository;
+        $this->entityMerger = $entityMerger;
     }
 
     /**
@@ -46,11 +58,11 @@ class DoctrineEntityDeserializationSubscriber implements EventSubscriberInterfac
                 'method' => 'onPreDeserialize',
                 'format' => 'json'
             ],
-            [
-                'event' => 'serializer.post_deserialize',
-                'method' => 'onPostDeserialize',
-                'format' => 'json'
-            ]
+//            [
+//                'event' => 'serializer.post_deserialize',
+//                'method' => 'onPostDeserialize',
+//                'format' => 'json'
+//            ]
         ];
     }
 
@@ -82,103 +94,87 @@ class DoctrineEntityDeserializationSubscriber implements EventSubscriberInterfac
                 continue;
             }
 
+            // TODO revisar cuando no es un array de entidades
             $data[$property->name] = [$annotation->idField => $data[$property->name]];
         }
-
         $event->setData($data);
     }
 
-    public function onPostDeserialize(ObjectEvent $event)
-    {
-        $type = $event->getType()['name'];
-
-        if (!class_exists($type)) {
-            return;
-        }
-
-        $object = $event->getObject();
-
-        $reflection = new ReflectionObject($object);
-
-        // por cada propiedad del objeto
-        foreach ($reflection->getProperties() as $property) {
-            /** @var DeserializeEntity $annotation */
-            $annotation = $this->reader->getPropertyAnnotation($property, DeserializeEntity::class);
-
-            // si no tiene la anotacion o no es una Entidad
-            if ($annotation === null || !class_exists($annotation->type)){
-                continue;
-            }
-
-            // Si el Recurso NO tiene el metodo para setear el Subrecurso
-            if (!$reflection->hasMethod($annotation->setter)) {
-                throw new LogicException("Object {$reflection->getName()} does not have the {$annotation->setter} method");
-            }
-
-            $property->setAccessible(true);
-
-            $repository = $this->doctrineRepository->getRepository($annotation->type);
-
-            // relación ManyToOne
-            if (!$this->reader->getPropertyAnnotation($property, ManyToMany::class)) {
-                $entity = $property->getValue($object);
-
-                if ($entity === null) {
-                    return;
-                }
-
-                // TODO copy from many to OR refactor (dry)
-                $entityId = $entity->{$annotation->idGetter}();
-
-                $entity = $repository->find($entityId);
-
-                if ($entity === null) {
-                    throw new NotFoundHttpException("Resource {$reflection->getShortName()}/$entityId");
-                }
-
-                $object->{$annotation->setter}{$entity};
-            // relación ManyToMany
-            } else {
-                // colección de subrecursos
-                $entityCollection = $property->getValue($object);
-
-                if ($entityCollection === null || !count($entityCollection) > 0) {
-                    continue;
-                }
-
-                // por cada subrecurso
-                foreach ($entityCollection as $subresourceDeserialized) {
-                    $entityId = $subresourceDeserialized->{$annotation->idGetter}();
-
-                    $entity = $repository->find($entityId);
-
-                    if ($entity === null) {
-                        // TODO new subresource (revisar si corresponde crear un subrecurso que no existe)
-                        throw new NotFoundHttpException("Resource {$reflection->getShortName()}/$entityId");
-                    }
-
-                    $entityReflection = new ReflectionObject($entity);
-
-                    foreach ($entityReflection->getProperties() as $subresourceProperty) {
-                        $subresourceProperty->setAccessible(true);
-                        $deserializedValue = $subresourceProperty->getValue($subresourceDeserialized);
-                        if ($deserializedValue === null) {
-                            continue;
-                        }
-
-                        if ($subresourceProperty->getValue($entity) != $deserializedValue) {
-                            if ($this->reader->getPropertyAnnotation($subresourceProperty, ManyToMany::class)) {
-                                continue;
-                            }
-                            throw new BadRequestHttpException("Cant modify a subresource, {$entityReflection->getShortName()}/$entityId");
-                        }
-                    }
-
-                    // reemplazo el recurso deserializado por la entidad
-                    $object->{$annotation->unsetter}($subresourceDeserialized);
-                    $object->{$annotation->setter}($entity);
-                }
-            }
-        }
-    }
+//    public function onPostDeserialize(ObjectEvent $event)
+//    {
+//        $type = $event->getType()['name'];
+//
+//        if (!class_exists($type)) {
+//            return;
+//        }
+//
+//        $object = $event->getObject();
+//
+//        dump($object);
+//
+//        $reflection = new ReflectionObject($object);
+//
+//        // por cada propiedad del objeto (busco las propidades que son Relaciones o Entidades)
+//        foreach ($reflection->getProperties() as $property) {
+//            /** @var DeserializeEntity $annotation */
+//            $annotation = $this->reader->getPropertyAnnotation($property, DeserializeEntity::class);
+//
+//            // si no tiene la anotacion o no es una Entidad
+//            if ($annotation === null || !class_exists($annotation->type)){
+//                continue;
+//            }
+//
+//            // Si el Recurso NO tiene el metodo para setear el Subrecurso
+//            if (!$reflection->hasMethod($annotation->setter)) {
+//                throw new LogicException("Object {$reflection->getName()} does not have the {$annotation->setter} method");
+//            }
+//
+//            // Si el Recurso NO tiene el metodo para remover el Subrecurso
+//            if (!$reflection->hasMethod($annotation->unsetter)) {
+//                throw new LogicException("Object {$reflection->getName()} does not have the {$annotation->unsetter} method");
+//            }
+//
+//            $property->setAccessible(true);
+//
+//            $repository = $this->doctrineRepository->getRepository($annotation->type);
+//
+//            $deserializedSubResources = $property->getValue($object);
+//
+//            if ($deserializedSubResources === null || !count($deserializedSubResources) > 0) {
+//                continue;
+//            }
+//
+//            // por cada subrecurso
+//            foreach ($deserializedSubResources as $deserializedSubResource) {
+//                $entityId = $deserializedSubResource->{$annotation->idGetter}();
+//                $entity = $repository->find($entityId);
+//
+//                if (null === $entity) {
+//                    // TODO new subresource (revisar si corresponde crear un subrecurso que no existe)
+//                    throw new NotFoundHttpException("Resource {$property->getName()}/$entityId");
+//                }
+//
+//                $entityReflection = new ReflectionObject($entity);
+//
+//                foreach ($entityReflection->getProperties() as $subresourceProperty) {
+//                    $subresourceProperty->setAccessible(true);
+//                    $deserializedValue = $subresourceProperty->getValue($deserializedSubResource);
+//                    if ($deserializedValue === null) {
+//                        continue;
+//                    }
+//
+//                    if ($subresourceProperty->getValue($entity) != $deserializedValue) {
+//                        if ($this->reader->getPropertyAnnotation($subresourceProperty, ManyToMany::class)) {
+//                            continue;
+//                        }
+//                        throw new BadRequestHttpException("Cant modify subresource {$entityReflection->getShortName()}/$entityId");
+//                    }
+//                }
+//
+//                // reemplazo el recurso deserializado por la entidad
+//                $object->{$annotation->unsetter}($deserializedSubResource);
+//                $object->{$annotation->setter}($entity);
+//            }
+//        }
+//    }
 }

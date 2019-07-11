@@ -12,7 +12,12 @@ dates:
     resource: App\Controller\Rest\DatesController
     prefix  : rest
 
-user:
-    type    : annotation
-    resource: App\Controller\Rest\UserController
+users:
+    type    : rest
+    resource: App\Controller\Rest\UsersController
+    prefix  : rest
+
+tokens:
+    type    : rest
+    resource: App\Controller\Rest\TokensController
     prefix  : rest

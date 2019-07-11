@@ -12,8 +12,12 @@ class LoadPersonasFixtures extends Fixture
     {
         $persona = new Persona();
         $persona->setFirstName('juan');
-
         $manager->persist($persona);
+
+        $persona1 = new Persona();
+        $persona1->setFirstName('Bar');
+        $manager->persist($persona1);
+
         $manager->flush();
     }
 }

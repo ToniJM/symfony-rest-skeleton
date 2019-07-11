@@ -59,8 +59,11 @@ class Persona
     private $alias;
 
     /**
-     * @ORM\ManyToMany(targetEntity="App\Entity\Date", mappedBy="personas")
+     * @ORM\ManyToMany(targetEntity="App\Entity\Date", mappedBy="personas", cascade={"persist"})
      * @App\DeserializeEntity(type="App\Entity\Date", idField="id", idGetter="getId", setter="addDate", unsetter="removeDate")
+     * @Serializer\Groups({"Deserialize"})
+     * @Serializer\Expose()
+     * @Serializer\MaxDepth(1)
      */
     private $dates;
 
@@ -115,7 +118,7 @@ class Persona
     }
 
     /**
-     * @ORM\PrePersist
+     * @ORM\PreUpdate()
      */
     public function prePersist(): self
     {
@@ -135,7 +138,7 @@ class Persona
 
     public function addDate(Date $date): self
     {
-        if (!$this->dates->contains($date)) {
+        if (null !== $this->dates && !$this->dates->contains($date)) {
             $this->dates[] = $date;
             $date->addPersona($this);
         }
@@ -145,7 +148,7 @@ class Persona
 
     public function removeDate(Date $date): self
     {
-        if ($this->dates->contains($date)) {
+        if (null !== $this->dates && $this->dates->contains($date)) {
             $this->dates->removeElement($date);
             $date->removePersona($this);
         }

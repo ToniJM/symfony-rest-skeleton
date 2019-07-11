@@ -33,4 +33,12 @@ services:
     App\Serializer\DoctrineEntityDeserializationSubscriber:
         tags: ['jms_serializer.event_subscriber']
         public: true
+#
+#    App\Serializer\Handler\ArrayHandler:
+#        tags: ['jms.serializer.subscribing_handler']
+#        public: true
+#
+    App\Serializer\Handler\EntityHandler:
+        tags: ['jms.serializer.subscribing_handler']
+        public: true
 

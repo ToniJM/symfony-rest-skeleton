@@ -23,7 +23,6 @@ class LoadUsersFixtures extends Fixture implements ContainerAwareInterface
         $user = new User();
         $user->setUsername('toni');
         $user->setPassword($passwordEncoder->encodePassword($user, 'toni'));
-        $user->setApiKey('sarasa');
         $user->setRoles(['ROLE_USER']);
 
         $manager->persist($user);
@@ -31,7 +30,6 @@ class LoadUsersFixtures extends Fixture implements ContainerAwareInterface
         $user1 = new User();
         $user1->setUsername('sosa');
         $user1->setPassword($passwordEncoder->encodePassword($user1, 'sosa'));
-        $user1->setApiKey('soroso');
         $user1->setRoles(['ROLE_USER']);
 
         $manager->persist($user1);

@@ -5,6 +5,8 @@ namespace App\Controller\Rest;
 
 
 use App\Entity\User;
+use Lexik\Bundle\JWTAuthenticationBundle\Encoder\JWTEncoderInterface;
+use Lexik\Bundle\JWTAuthenticationBundle\Exception\JWTEncodeFailureException;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
@@ -18,16 +20,22 @@ class UserController extends AbstractController
      * @var UserPasswordEncoderInterface
      */
     private $passwordEncoder;
+    /**
+     * @var JWTEncoderInterface
+     */
+    private $JWTEncoder;
 
-    public function __construct(UserPasswordEncoderInterface $passwordEncoder)
+    public function __construct(UserPasswordEncoderInterface $passwordEncoder, JWTEncoderInterface $JWTEncoder)
     {
         $this->passwordEncoder = $passwordEncoder;
+        $this->JWTEncoder = $JWTEncoder;
     }
 
     /**
      * @Route("/user/token", methods={"POST"})
      * @param Request $request
      * @return JsonResponse
+     * @throws JWTEncodeFailureException
      */
     public function tokenAction(Request $request)
     {
@@ -43,6 +51,12 @@ class UserController extends AbstractController
             throw new BadCredentialsException();
         }
 
-        return new JsonResponse(['token' => $user->getApiKey()]);
+
+        $token = $this->JWTEncoder->encode([
+            'username' => $user->getUsername(),
+            'exp' => time() + 3600,
+        ]);
+
+        return new JsonResponse(['token' => $token]);
     }
 }

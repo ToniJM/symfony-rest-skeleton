@@ -15,6 +15,7 @@ use Symfony\Component\Validator\Constraints as Assert;
  * @ORM\Entity(repositoryClass="App\Repository\DateRepository")
  * @ORM\HasLifecycleCallbacks()
  * @Serializer\ExclusionPolicy("ALL")
+ * @Hateoas\Relation("self", href=@Hateoas\Route("get_date", parameters={"date"="expr(object.getId())"}))
  */
 class Date
 {
@@ -59,6 +60,7 @@ class Date
      * @App\DeserializeEntity(type="App\Entity\Persona", idField="id", idGetter="getId", setter="addPersona", unsetter="removePersona")
      * @Serializer\Groups({"Deserialize"})
      * @Serializer\Expose()
+     * @Serializer\MaxDepth(1)
      */
     private $personas;
 
@@ -118,8 +120,9 @@ class Date
 
     public function addPersona(Persona $persona): self
     {
-        if (!$this->personas->contains($persona)) {
+        if (null !== $this->personas && !$this->personas->contains($persona)) {
             $this->personas[] = $persona;
+            $persona->addDate($this);
         }
 
         return $this;
@@ -127,7 +130,7 @@ class Date
 
     public function removePersona(Persona $persona): self
     {
-        if ($this->personas->contains($persona)) {
+        if (null !== $this->personas && $this->personas->contains($persona)) {
             $this->personas->removeElement($persona);
         }
 
@@ -152,6 +155,6 @@ class Date
 
     public function __toString()
     {
-        return $this->getName();
+        return $this->getName() ? $this->getName() : "nieva";
     }
 }
