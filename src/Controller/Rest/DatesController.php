@@ -107,7 +107,7 @@ class DatesController extends AbstractFOSRestController
      * @return View
      * @throws ReflectionException
      */
-    public function patchDatesAction(Date $date = null, Date $patch, ConstraintViolationListInterface $violationList)
+    public function patchDatesAction(?Date $date, Date $patch, ConstraintViolationListInterface $violationList)
     {
         if ($date === null) {
             return $this->view(null, Response::HTTP_NOT_FOUND);

@@ -3,40 +3,63 @@
 namespace App\Entity;
 
 use Doctrine\ORM\Mapping as ORM;
+use JMS\Serializer\Annotation as Serializer;
+use Symfony\Bridge\Doctrine\Validator\Constraints\UniqueEntity;
 use Symfony\Component\Security\Core\User\UserInterface;
+use Symfony\Component\Validator\Constraints as Assert;
 
 /**
  * @ORM\Entity(repositoryClass="App\Repository\UserRepository")
  * @ORM\Table("users")
+ * @UniqueEntity("username", groups={"Default", "Patch"})
  */
 class User implements UserInterface
 {
+    const ROLE_USER = 'ROLE_USER';
+    const ROLE_ADMIN = 'ROLE_ADMIN';
+
     /**
      * @ORM\Id()
      * @ORM\GeneratedValue()
      * @ORM\Column(type="integer")
+     * @Serializer\Groups({"Default", "Deserialize"})
      */
     private $id;
 
     /**
      * @ORM\Column(type="string", length=180, unique=true)
+     * @Assert\NotBlank(groups={"Default"})
+     * @Assert\Length(min="4")
+     * @Serializer\Groups({"Default", "Deserialize"})
      */
     private $username;
 
     /**
-     * @ORM\Column(type="json")
-     */
-    private $roles = [];
-
-    /**
-     * @ORM\Column(type="string", length=255, unique=true)
-     */
-    private $apiKey;
-
-    /**
      * @ORM\Column(type="string", length=255)
+     * @Assert\NotBlank(groups={"Default"})
+     * @Serializer\Groups("Deserialize")
      */
     private $password;
+
+    /**
+     * @var string
+     * @Assert\NotBlank(groups={"Default"})
+     * @Assert\Expression(
+     *     "this.getPassword() === this.getRetypedPassword()",
+     *     message="Passwords do not match",
+     *     groups={"Default", "Patch"}
+     * )
+     * @Serializer\Type("string")
+     * @Serializer\Groups("Deserialize")
+     */
+    private $retypedPassword;
+
+    /**
+     * @ORM\Column(type="json")
+     * @Serializer\Groups({"Deserialize"})
+     * @Serializer\Exclude()
+     */
+    private $roles = [];
 
     public function getId(): ?int
     {
@@ -104,22 +127,27 @@ class User implements UserInterface
         // $this->plainPassword = null;
     }
 
-    public function getApiKey(): ?string
-    {
-        return $this->apiKey;
-    }
-
-    public function setApiKey(string $apiKey): self
-    {
-        $this->apiKey = $apiKey;
-
-        return $this;
-    }
-
     public function setPassword(string $password): self
     {
         $this->password = $password;
 
         return $this;
+    }
+
+
+    /**
+     * @return string
+     */
+    public function getRetypedPassword(): ?string
+    {
+        return $this->retypedPassword;
+    }
+
+    /**
+     * @param string $retypedPassword
+     */
+    public function setRetypedPassword(string $retypedPassword): void
+    {
+        $this->retypedPassword = $retypedPassword;
     }
 }

@@ -5,8 +5,10 @@ namespace App\Controller\Rest;
 
 
 use App\Entity\User;
+use FOS\RestBundle\Controller\ControllerTrait;
 use Lexik\Bundle\JWTAuthenticationBundle\Encoder\JWTEncoderInterface;
 use Lexik\Bundle\JWTAuthenticationBundle\Exception\JWTEncodeFailureException;
+use Sensio\Bundle\FrameworkExtraBundle\Configuration\Security;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
@@ -14,7 +16,10 @@ use Symfony\Component\Routing\Annotation\Route;
 use Symfony\Component\Security\Core\Encoder\UserPasswordEncoderInterface;
 use Symfony\Component\Security\Core\Exception\BadCredentialsException;
 
-class UserController extends AbstractController
+/**
+ * @Security("is_anonymous() or is_authenticated()")
+ */
+class TokensController extends AbstractController
 {
     /**
      * @var UserPasswordEncoderInterface
@@ -32,12 +37,11 @@ class UserController extends AbstractController
     }
 
     /**
-     * @Route("/user/token", methods={"POST"})
      * @param Request $request
      * @return JsonResponse
      * @throws JWTEncodeFailureException
      */
-    public function tokenAction(Request $request)
+    public function postTokensAction(Request $request)
     {
         $userRepository = $this->getDoctrine()->getRepository(User::class);
         $user = $userRepository->findOneBy(["username" => $request->getUser()]);
@@ -50,7 +54,6 @@ class UserController extends AbstractController
         if (!$isPasswordValid) {
             throw new BadCredentialsException();
         }
-
 
         $token = $this->JWTEncoder->encode([
             'username' => $user->getUsername(),

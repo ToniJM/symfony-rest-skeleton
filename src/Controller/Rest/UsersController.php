@@ -5,16 +5,19 @@ namespace App\Controller\Rest;
 
 
 use App\Entity\User;
+use App\Exception\ValidationException;
+use App\Service\EntityMerger;
+use FOS\RestBundle\Controller\Annotations as Rest;
 use Lexik\Bundle\JWTAuthenticationBundle\Encoder\JWTEncoderInterface;
-use Lexik\Bundle\JWTAuthenticationBundle\Exception\JWTEncodeFailureException;
+use ReflectionException;
+use Sensio\Bundle\FrameworkExtraBundle\Configuration\ParamConverter;
+use Sensio\Bundle\FrameworkExtraBundle\Configuration\Security;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
-use Symfony\Component\HttpFoundation\JsonResponse;
-use Symfony\Component\HttpFoundation\Request;
-use Symfony\Component\Routing\Annotation\Route;
+use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 use Symfony\Component\Security\Core\Encoder\UserPasswordEncoderInterface;
-use Symfony\Component\Security\Core\Exception\BadCredentialsException;
+use Symfony\Component\Validator\ConstraintViolationListInterface;
 
-class UserController extends AbstractController
+class UsersController extends AbstractController
 {
     /**
      * @var UserPasswordEncoderInterface
@@ -24,39 +27,104 @@ class UserController extends AbstractController
      * @var JWTEncoderInterface
      */
     private $JWTEncoder;
+    /**
+     * @var EntityMerger
+     */
+    private $merger;
 
-    public function __construct(UserPasswordEncoderInterface $passwordEncoder, JWTEncoderInterface $JWTEncoder)
+    public function __construct(UserPasswordEncoderInterface $passwordEncoder, JWTEncoderInterface $JWTEncoder, EntityMerger $merger)
     {
         $this->passwordEncoder = $passwordEncoder;
         $this->JWTEncoder = $JWTEncoder;
+        $this->merger = $merger;
     }
 
     /**
-     * @Route("/user/token", methods={"POST"})
-     * @param Request $request
-     * @return JsonResponse
-     * @throws JWTEncodeFailureException
+     * @Security("is_granted('show', theUser)", message="Access denied")
+     * @Rest\View(serializerGroups={"Default"})
+     * @param User|null $theUser
+     * @return User|null
      */
-    public function tokenAction(Request $request)
+    public function getUserAction(?User $theUser)
     {
-        $userRepository = $this->getDoctrine()->getRepository(User::class);
-        $user = $userRepository->findOneBy(["username" => $request->getUser()]);
-
-        if (!$user) {
-            throw new BadCredentialsException();
+        if (null === $theUser) {
+            throw new NotFoundHttpException();
         }
 
-        $isPasswordValid = $this->passwordEncoder->isPasswordValid($user, $request->getPassword());
-        if (!$isPasswordValid) {
-            throw new BadCredentialsException();
+        return $theUser;
+    }
+
+    /**
+     * @ParamConverter("user", converter="fos_rest.request_body", options={"deserializationContext"={"groups"={"Deserialize"}}})
+     * @Rest\View(serializerGroups={"Default"})
+     * @param User $user
+     * @param ConstraintViolationListInterface $violationList
+     * @return User
+     */
+    public function postUsersAction(User $user, ConstraintViolationListInterface $violationList)
+    {
+        if (count($violationList) > 0) {
+            throw new ValidationException($violationList);
         }
 
+        $this->encodePassword($user);
 
-        $token = $this->JWTEncoder->encode([
-            'username' => $user->getUsername(),
-            'exp' => time() + 3600,
-        ]);
+        $user->setRoles([User::ROLE_USER]);
 
-        return new JsonResponse(['token' => $token]);
+        $this->persistUser($user);
+
+        return $user;
+    }
+
+    /**
+     * @ParamConverter("patch", converter="fos_rest.request_body",
+     *     options={
+     *          "deserializationContext"={"groups"={"Deserialize"}},
+     *          "validator"={"groups"={"Patch"}}
+     *     }
+     * )
+     * @Security("is_granted('edit', theUser)", message="Access denied")
+     * @Rest\View(serializerGroups={"Default"})
+     * @param User|null $theUser
+     * @param User $patch
+     * @param ConstraintViolationListInterface $violationList
+     * @return User|null
+     * @throws ReflectionException
+     */
+    public function patchUsersAction(?User $theUser, User $patch, ConstraintViolationListInterface $violationList)
+    {
+        if (null === $theUser) {
+            throw new NotFoundHttpException();
+        }
+
+        if (count($violationList) > 0) {
+            throw new ValidationException($violationList);
+        }
+
+        $this->merger->merge($theUser, $patch);
+        $this->encodePassword($theUser);
+        $this->persistUser($theUser);
+
+        return $theUser;
+    }
+
+    /**
+     * @param User $user
+     */
+    protected function encodePassword(User $user): void
+    {
+        $user->setPassword(
+            $this->passwordEncoder->encodePassword($user, $user->getPassword())
+        );
+    }
+
+    /**
+     * @param User $user
+     */
+    protected function persistUser(User $user): void
+    {
+        $em = $this->getDoctrine()->getManager();
+        $em->persist($user);
+        $em->flush();
     }
 }

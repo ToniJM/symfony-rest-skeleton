@@ -4,12 +4,14 @@
 namespace App\Security;
 
 
+use Lexik\Bundle\JWTAuthenticationBundle\Encoder\JWTEncoderInterface;
+use Lexik\Bundle\JWTAuthenticationBundle\Exception\JWTDecodeFailureException;
+use Lexik\Bundle\JWTAuthenticationBundle\TokenExtractor\AuthorizationHeaderTokenExtractor;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Security\Core\Authentication\Token\TokenInterface;
 use Symfony\Component\Security\Core\Exception\AuthenticationException;
-use Symfony\Component\Security\Core\User\User;
 use Symfony\Component\Security\Core\User\UserInterface;
 use Symfony\Component\Security\Core\User\UserProviderInterface;
 use Symfony\Component\Security\Guard\AbstractGuardAuthenticator;
@@ -17,6 +19,16 @@ use UnexpectedValueException;
 
 class TokenAuthenticator extends AbstractGuardAuthenticator
 {
+    /**
+     * @var JWTEncoderInterface
+     */
+    private $JWTEncoder;
+
+    public function __construct(JWTEncoderInterface $JWTEncoder)
+    {
+        $this->JWTEncoder = $JWTEncoder;
+    }
+
     /**
      * Returns a response that directs the user to authenticate.
      *
@@ -83,9 +95,9 @@ class TokenAuthenticator extends AbstractGuardAuthenticator
      */
     public function getCredentials(Request $request)
     {
-        $token = $request->headers->get('X-Auth-Token', false);
+        $extractor = new AuthorizationHeaderTokenExtractor('Bearer', 'Authorization');
 
-        return $token;
+        return $extractor->extract($request);
     }
 
     /**
@@ -105,7 +117,17 @@ class TokenAuthenticator extends AbstractGuardAuthenticator
      */
     public function getUser($credentials, UserProviderInterface $userProvider)
     {
-        return $userProvider->loadUserByUsername($credentials);
+        try {
+            $data = $this->JWTEncoder->decode($credentials);
+
+            if (!$data) {
+                return null;
+            }
+
+            return $userProvider->loadUserByUsername($data['username']);
+        } catch (JWTDecodeFailureException $exception) {
+            return null;
+        }
     }
 
     /**

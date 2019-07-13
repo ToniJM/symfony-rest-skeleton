@@ -67,6 +67,16 @@ class EntityMerger
                 if (!$entityReflection->hasProperty($patchProperty->getName())) {
                     continue;
                 }
+
+                // si es nulo la salteamos
+                if (null === $patchPropertyValue) {
+                    continue;
+                }
+
+                // si la propiedad es un array vacio la salteamos
+                if (is_array($patchPropertyValue) and count($patchPropertyValue) <= 0) {
+                    continue;
+                }
             }
             else {
                 // no esta seteada la propiedad en map y
