@@ -6,6 +6,7 @@ namespace App\Serializer\Handler;
 use App\Annotation\DeserializeEntity;
 use App\Entity\Date;
 use App\Entity\Persona;
+use DateTime;
 use Doctrine\Common\Annotations\Reader;
 use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\ORM\Mapping\Column;
@@ -77,11 +78,10 @@ class EntityHandler implements SubscribingHandlerInterface
         } else {
             $entity = new $type['name']();
             $reflection = new ReflectionObject($entity);
-            
+
             // recorro las propiedades
             foreach ($reflection->getProperties() as $property) {
                 if (!isset($data[$property->getName()])) {
-
                     continue;
                 }
 
@@ -92,11 +92,30 @@ class EntityHandler implements SubscribingHandlerInterface
 
                 $columnAnnotation = $this->reader->getPropertyAnnotation($property, Column::class);
                 if (null !== $columnAnnotation) {
-                    $val = $context->getNavigator()->accept($data[$property->getName()], [
-                        'name' => $columnAnnotation->type == 'date' ? 'DateTime' : $columnAnnotation->type,
-                        'params' => []
-                    ]);
+                    switch ($columnAnnotation->type) {
+                        case 'date':
+                            $columnType = null;
+                            $val = DateTime::createFromFormat('Y-m-d', $data[$property->getName()]);
+                            if (!$val) {
+                                $val = $data[$property->getName()];
+                            }
+                            break;
+                        case 'text':
+                            $columnType = 'string';
+                            break;
+                        default:
+                            $columnType = $columnAnnotation->type;
+                    }
+                    if (null !== $columnType) {
+                        $val = $context->getNavigator()->accept($data[$property->getName()], [
+                            'name' => $columnType,
+                            'params' => []
+                        ]);
+                    }
 
+                    if (!isset($val)) {
+                        throw new LogicException();
+                    }
                     $property->setAccessible(true);
                     $property->setValue($entity, $val);
                     continue;
