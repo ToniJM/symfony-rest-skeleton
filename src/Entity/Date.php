@@ -27,6 +27,7 @@ class Date
      * @ORM\Column(type="integer")
      * @Serializer\Groups({"Default", "Deserialize"})
      * @Serializer\Expose()
+     * @Serializer\Type("DateTime<'Y-m-d'>")
      */
     private $id;
 
